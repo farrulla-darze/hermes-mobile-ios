@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 
+import '../../core/config/cleartext_host_policy.dart';
 import '../../core/diagnostics/turn_capture.dart';
 import '../../domain/models/approval_request.dart';
 import '../../domain/models/gateway_command.dart';
@@ -62,7 +63,7 @@ final class IoGatewaySocket implements GatewaySocket {
 
 class DashboardGatewayRepository implements GatewayRepository {
   static const invalidBaseUrlMessage =
-      'Use HTTPS ou HTTP em um host MagicDNS do Tailnet (*.ts.net).';
+      'Use HTTPS, ou HTTP em um host MagicDNS do Tailnet (*.ts.net) ou na rede local.';
 
   /// O gateway só anuncia esse keepalive em `gateway.ready.heartbeat`.
   /// Os valores acompanham o cliente Desktop: uma sondagem a cada 15 s e
@@ -1327,16 +1328,12 @@ class DashboardGatewayRepository implements GatewayRepository {
 
     final scheme = uri.scheme.toLowerCase();
     if (scheme != 'https' && scheme != 'http') return null;
-    if (scheme == 'http' && !_isTailnetHost(uri.host)) return null;
+    if (scheme == 'http' && !isCleartextAllowedHost(uri.host)) return null;
     return uri.replace(scheme: scheme).toString();
   }
 
   static bool supportsBaseUrl(String raw) => _normalizeBaseUrl(raw) != null;
 
-  static bool _isTailnetHost(String host) {
-    final normalized = host.toLowerCase();
-    return normalized.endsWith('.ts.net');
-  }
 
   static Uri _webSocketUri(String baseUrl, String ticket) {
     final baseUri = Uri.parse(baseUrl);

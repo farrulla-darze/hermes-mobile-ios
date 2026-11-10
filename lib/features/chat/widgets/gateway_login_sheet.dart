@@ -125,7 +125,7 @@ class _GatewayLoginFormState extends State<_GatewayLoginForm> {
             autocorrect: false,
             enableSuggestions: false,
             style: t.mono.copyWith(fontSize: 12, color: t.ink),
-            decoration: decoration('HTTPS ou HTTP em *.ts.net'),
+            decoration: decoration('HTTPS, ou HTTP em *.ts.net / rede local'),
           ),
           const SizedBox(height: 11),
           TextField(
