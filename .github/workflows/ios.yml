@@ -1,0 +1,82 @@
+name: iOS build
+
+on:
+  push:
+    branches: ["main"]
+    tags: ["ios-v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios:
+    name: Analyze, test, and build unsigned IPA
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.6
+          cache: true
+
+      - name: Toolchain versions
+        run: |
+          xcodebuild -version
+          flutter --version
+          pod --version || true
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Generate Dart code
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Analyze Dart
+        run: flutter analyze
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Build iOS app (release, unsigned)
+        run: |
+          BUILD_NUMBER=${{ github.run_number }}
+          flutter build ios --release --no-codesign --build-number="$BUILD_NUMBER"
+
+      - name: Package unsigned IPA
+        run: |
+          set -euo pipefail
+          rm -rf build/ipa && mkdir -p build/ipa/Payload
+          cp -R build/ios/iphoneos/Runner.app build/ipa/Payload/
+          (cd build/ipa && zip -qry HermesMobile-unsigned.ipa Payload)
+          ls -lh build/ipa/HermesMobile-unsigned.ipa
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" -c "Print :CFBundleShortVersionString" -c "Print :CFBundleVersion" build/ios/iphoneos/Runner.app/Info.plist
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: hermes-mobile-ios-unsigned-ipa
+          path: build/ipa/HermesMobile-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish release (tags only)
+        if: startsWith(github.ref, 'refs/tags/ios-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" build/ipa/HermesMobile-unsigned.ipa \
+            --title "Hermes Mobile iOS ${GITHUB_REF_NAME#ios-v}" \
+            --notes "Unsigned IPA. Sign and install with Sideloadly/AltStore or Xcode (see docs/ios/INSTALL.md)." \
+            || gh release upload "${GITHUB_REF_NAME}" build/ipa/HermesMobile-unsigned.ipa --clobber

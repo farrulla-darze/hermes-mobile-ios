@@ -1,0 +1,69 @@
+name: Sync upstream (M1gue11/hermes-mobile)
+
+# Keeps this iOS fork current with the Android/Flutter upstream. Upstream
+# changes land on an `upstream-sync` branch and open a PR, so the iOS build
+# runs against them before anything reaches main. A merge conflict opens an
+# issue instead (resolve locally: git fetch upstream && git merge upstream/main).
+
+on:
+  schedule:
+    - cron: "17 9 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Merge upstream main
+        id: merge
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/M1gue11/hermes-mobile.git
+          git fetch upstream main
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "Already up to date with upstream."
+            echo "result=uptodate" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git checkout -B upstream-sync
+          if git merge --no-edit upstream/main; then
+            echo "result=merged" >> "$GITHUB_OUTPUT"
+          else
+            git merge --abort
+            echo "result=conflict" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open sync PR
+        if: steps.merge.outputs.result == 'merged'
+        run: |
+          set -euo pipefail
+          git push -f origin upstream-sync
+          if [ -z "$(gh pr list --head upstream-sync --state open --json number --jq '.[].number')" ]; then
+            gh pr create --head upstream-sync --base main \
+              --title "Sync upstream hermes-mobile" \
+              --body "Automated merge of M1gue11/hermes-mobile main. The iOS build workflow validates this PR."
+          fi
+          # Events from GITHUB_TOKEN do not trigger workflows; dispatch the build explicitly.
+          gh workflow run ios.yml --ref upstream-sync
+
+      - name: Report conflict
+        if: steps.merge.outputs.result == 'conflict'
+        run: |
+          TITLE="Upstream sync needs a manual merge"
+          if [ -z "$(gh issue list --state open --search "$TITLE in:title" --json number --jq '.[].number')" ]; then
+            gh issue create --title "$TITLE" --body "Merging M1gue11/hermes-mobile main conflicts with this fork (usually ios/ files). Locally: \`git fetch upstream && git merge upstream/main\`, resolve, push."
+          fi
