@@ -78,5 +78,5 @@ jobs:
         run: |
           gh release create "${GITHUB_REF_NAME}" build/ipa/HermesMobile-unsigned.ipa \
             --title "Hermes Mobile iOS ${GITHUB_REF_NAME#ios-v}" \
-            --notes "Unsigned IPA. Sign and install with Sideloadly/AltStore or Xcode (see docs/ios/INSTALL.md)." \
+            --notes "Unsigned IPA. Sign and install with Sideloadly/AltStore or Xcode (see docs/ios/README.md)." \
             || gh release upload "${GITHUB_REF_NAME}" build/ipa/HermesMobile-unsigned.ipa --clobber

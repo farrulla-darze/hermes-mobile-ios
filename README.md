@@ -1,4 +1,8 @@
-# Hermes Mobile
+# Hermes Mobile (iOS)
+
+> **Fork iOS** de [M1gue11/hermes-mobile](https://github.com/M1gue11/hermes-mobile).
+> Instalação no iPhone, servidor na rede local, CI e sincronização com o upstream:
+> [`docs/ios/README.md`](docs/ios/README.md).
 
 Hermes Mobile é um cliente Flutter experimental e não oficial para interagir com
 o agente Hermes em dispositivos móveis. O projeto explora conversas, streaming,
